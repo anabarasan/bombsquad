@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vaaichol Veerargal</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.0/font/bootstrap-icons.css"
+    />
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css"
+    />
+    <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://cdn.datatables.net/1.11.3/js/jquery.dataTables.min.js"></script>
+    <script>
+      $(document).ready(function () {
+        $.get("/stats.json", function (data) {
+          for (key in data) {
+            let row_data = data[key];
+            let row = `<tr><td>${row_data.rank}</td><td>${row_data.name_html}</td><td>${row_data.scores}</td><td>${row_data.kills}</td><td>${row_data.deaths}</td><td>${row_data.games}</td><td>${row_data.avg_score}</td></tr>`;
+            $("#tbody").append(row);
+          }
+          $("#myTable").DataTable({
+            info: false,
+            ordering: true,
+            paging: false,
+            responsive: true,
+            searching: false,
+          });
+        });
+      });
+    </script>
+  </head>
+  <body class="container">
+    <h1 style="text-align: center">வாய்ச்சொல் வீரர்கள்</h1>
+    <table
+      id="myTable"
+      class="table table-responsive table-striped table-hover"
+    >
+      <thead>
+        <tr>
+          <th scope="col">Rank</th>
+          <th scope="col">Name</th>
+          <th scope="col">Score</th>
+          <th scope="col">Kills</th>
+          <th scope="col">Deaths</th>
+          <th scope="col">Games</th>
+          <th scope="col">Average Score</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </body>
+</html>
