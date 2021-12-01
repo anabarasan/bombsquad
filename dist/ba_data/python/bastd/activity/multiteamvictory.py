@@ -313,6 +313,8 @@ class TeamSeriesVictoryScoreScreenActivity(MultiTeamScoreScreenActivity):
                  transition_delay=tdelay).autoretain()
 
         ba.timer(15.0, ba.WeakCall(self._show_tips))
+        from series_summary import SeriesSummary
+        SeriesSummary.save_summary()
 
     def _show_tips(self) -> None:
         from bastd.actor.tipstext import TipsText
