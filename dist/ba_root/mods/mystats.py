@@ -6,6 +6,7 @@ Provides functionality for dumping player stats to disk between rounds.
 from datetime import datetime
 import threading, json, os, urllib.request
 import mysettings
+from series_summary import SeriesSummary
 
 
 def refreshStats():

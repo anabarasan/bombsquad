@@ -38,7 +38,7 @@ SUMMARY_HTML = """<!doctype html>
       &#x0BB5;&#x0BC0;&#x0BB0;&#X0BB0;&#X0BCD;&#x0B95;&#x0BB3;&#X0BCD;
     </h1>
     <h2 style="text-align:center">series at <<<series_time_stamp>>></h2>
-    <h3 style="text-align:center">won by <<<team_name>>></h3>
+    <h3 style="text-align:center">won by <<<winning_team_name>>></h3>
     <br/><br/>
     <<<details>>>
   </body>
@@ -48,6 +48,10 @@ SUMMARY_HTML = """<!doctype html>
 
 class SeriesSummary:
     match_results = []
+    winning_sessionteam = None
+    most_valuable_player = (None, None, None)
+    most_violent_player = (None, None, None)
+    most_violated_player = (None, None, None)
 
     @classmethod
     def append(cls, results: GameResults, stats: ba.Stats) -> None:
@@ -77,24 +81,22 @@ class SeriesSummary:
         cls.match_results.append(data)
 
     @classmethod
-    def save_summary(
-        cls,
-        winning_team,
-        most_valuable_player,
-        most_violent_player,
-        most_violated_player,
-    ):
+    def save_summary(cls):
         now = datetime.strftime(datetime.now(), "%Y%m%d%H%m%S%f")
         filename = os.path.join(mysettings.series_dir, f"{now}.html")
         print(f"saving summary to {filename}")
         html = ""
-        if most_valuable_player[1]:
-            html += f"""<div class="row">&#x1F947; Most Valuable Player {most_valuable_player[1]}</div>"""
-        if most_violent_player[1]:
-            html += f"""<div class="row">&#x2620; Most Violent Player {most_violent_player[1]}</div>"""
-        if most_violated_player[1]:
-            html += f"""<div class="row">&#x1F637; Most Violated Player {most_violated_player[1]}</div>"""
-        if most_valuable_player[1] or most_violent_player[1] or most_violated_player[1]:
+        if cls.most_valuable_player[1]:
+            html += f"""<div class="row">&#x1F947; Most Valuable Player {cls.most_valuable_player[1]}</div>"""
+        if cls.most_violent_player[1]:
+            html += f"""<div class="row">&#x2620; Most Violent Player {cls.most_violent_player[1]} ({cls.most_violent_player[2]} kills)</div>"""
+        if cls.most_violated_player[1]:
+            html += f"""<div class="row">&#x1F637; Most Violated Player {cls.most_violated_player[1]} ({cls.most_violated_player[2]} deaths)</div>"""
+        if (
+            cls.most_valuable_player[1]
+            or cls.most_violent_player[1]
+            or cls.most_violated_player[1]
+        ):
             html += "<br/><br/>"
         for idx, match_result in enumerate(cls.match_results):
             winner = match_result["winner"]
@@ -106,7 +108,7 @@ class SeriesSummary:
                 html += """<div class="col">"""
                 html += """<div class="row">"""
                 # html += f"""{team["name"]} ({team["score"]})"""
-                html += f"""{f'<i class="bi bi-trophy warning">{team["name"]} ({team["score"]})</i>' if team["name"] == winner else f'{team["name"]} ({team["score"]})'}"""
+                html += f"""{f'<i class="bi bi-trophy warning">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{team["name"]} ({team["score"]})</i>' if team["name"] == winner else f'{team["name"]} ({team["score"]})'}"""
                 html += """</div>"""
                 for player, player_score in team["players"]:
                     html += """<div class="row">"""
@@ -115,11 +117,12 @@ class SeriesSummary:
                 html += """</div>"""
             html += """</div>"""
             html += "</div>"
-            html += "<br/><br/><br/>"
+            html += "<br/><hr/><br/>"
         html = (
             SUMMARY_HTML.replace("<<<details>>>", html)
             .replace("<<<series_time_stamp>>>", now)
             .replace("<<<team_name>>>", "")
+            .replace("<<<winning_team_name>>>", cls.winning_sessionteam.name.evaluate())
         )
 
         with open(filename, "w") as f:

@@ -321,11 +321,12 @@ class TeamSeriesVictoryScoreScreenActivity(MultiTeamScoreScreenActivity):
 
         ba.timer(15.0, ba.WeakCall(self._show_tips))
         from series_summary import SeriesSummary
-        SeriesSummary.save_summary(
-            winning_sessionteam,
-            most_valuable_player,
-            most_violent_player,
-            most_violated_player)
+        SeriesSummary.winning_sessionteam = winning_sessionteam
+        SeriesSummary.most_valuable_player = most_valuable_player
+        SeriesSummary.most_violent_player = most_violent_player
+        SeriesSummary.most_violated_player = most_violated_player
+        print("Series Done!")
+        SeriesSummary.save_summary()
 
     def _show_tips(self) -> None:
         from bastd.actor.tipstext import TipsText
