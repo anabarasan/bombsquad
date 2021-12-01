@@ -57,7 +57,7 @@ class SeriesSummary:
             player_scores[player.getname(True)] = player.accumscore
 
         winning_team = results.winning_sessionteam
-        data["winner"] = winning_team.name.evaluate()
+        data["winner"] = winning_team.name.evaluate() if winning_team else "no winner"
         data["teams"] = []
 
         for team in results.sessionteams:
