@@ -77,21 +77,36 @@ class SeriesSummary:
         cls.match_results.append(data)
 
     @classmethod
-    def save_summary(cls):
+    def save_summary(
+        cls,
+        winning_team,
+        most_valuable_player,
+        most_violent_player,
+        most_violated_player,
+    ):
         now = datetime.strftime(datetime.now(), "%Y%m%d%H%m%S%f")
         filename = os.path.join(mysettings.series_dir, f"{now}.html")
-
+        print(f"saving summary to {filename}")
         html = ""
+        if most_valuable_player[1]:
+            html += f"""<div class="row">&#x1F947; Most Valuable Player {most_valuable_player[1]}</div>"""
+        if most_violent_player[1]:
+            html += f"""<div class="row">&#x2620; Most Violent Player {most_violent_player[1]}</div>"""
+        if most_violated_player[1]:
+            html += f"""<div class="row">&#x1F637; Most Violated Player {most_violated_player[1]}</div>"""
+        if most_valuable_player[1] or most_violent_player[1] or most_violated_player[1]:
+            html += "<br/><br/>"
         for idx, match_result in enumerate(cls.match_results):
             winner = match_result["winner"]
             html += """<div class="row">"""
-            html += f"""<div class="row"><h3>Match {idx +1}</h3></div>"""
-            html += f"""<div class="row"><h3>Won by {winner}</h3></div>"""
+            html += f"""<div class="row"><h3>Match {idx +1} </h3></div>"""
+            # html += f"""<div class="row"><h3>Won by {winner}</h3></div>"""
             html += """<div class="row">"""
             for team in match_result["teams"]:
                 html += """<div class="col">"""
                 html += """<div class="row">"""
-                html += f"""{team["name"]} ({team["score"]})"""
+                # html += f"""{team["name"]} ({team["score"]})"""
+                html += f"""{f'<i class="bi bi-trophy warning">{team["name"]} ({team["score"]})</i>' if team["name"] == winner else f'{team["name"]} ({team["score"]})'}"""
                 html += """</div>"""
                 for player, player_score in team["players"]:
                     html += """<div class="row">"""
@@ -109,4 +124,3 @@ class SeriesSummary:
 
         with open(filename, "w") as f:
             f.write(html)
-        print(f"saved summary to {filename}")
