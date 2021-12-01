@@ -1,41 +1,16 @@
-damage_data = {}
-# Don't touch the above line
 """
 mystats module for BombSquad version 1.6.5
 Provides functionality for dumping player stats to disk between rounds.
 """
 
+from datetime import datetime
 import threading, json, os, urllib.request
 import mysettings
 
-table_style = "{width:100%;border: 3px solid black;border-spacing: 5px;border-collapse:collapse;text-align:center;background-color:#fff}"
-heading_style = "{border: 3px solid black;text-align:center;}"
-html_start = f"""<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="UTF-8">
-        <title>Test Server</title>
-        <style>table{table_style} th{heading_style}</style>
-    </head>
-    <body>
-        <h3 style="text-align:center">Top 200 Players of {mysettings.server_name}</h3>
-        <table border=1>
-            <tr>
-                <th><b>Rank</b></th>
-                <th style="text-align:center"><b>Name</b></th>
-                <th><b>Score</b></th>
-                <th><b>Kills</b></th>
-                <th><b>Deaths</b></th>
-                <th><b>Games Played</b></th>
-            </tr>
-"""
-#                <th><b>Total Damage</b></th>  #removed this line as it isn't crt data
+
 def refreshStats():
-    # lastly, write a pretty html version.
-    # our stats url could point at something like this...
+    # computations
     stats = mysettings.get_stats()
-    # f = open(mysettings.html_file, "w")
-    # f.write(html_start)
     entries = [
         (a["scores"], a["kills"], a["deaths"], a["games"], a["name_html"], a["aid"])
         for a in stats.values()
@@ -72,56 +47,17 @@ def refreshStats():
                 p_avg_score = avg_score_int + "." + avg_score_dec[:3]
             except Exception:
                 p_avg_score = "0"
-            if damage_data and aid in damage_data:
-                dmg = damage_data[aid]
-                dmg = str(str(dmg).split(".")[0] + "." + str(dmg).split(".")[1][:3])
-            else:
-                dmg = 0
             pStats[str(aid)]["rank"] = int(rank)
             pStats[str(aid)]["scores"] = int(scores)
-            pStats[str(aid)]["total_damage"] += float(dmg)  # not working properly
             pStats[str(aid)]["games"] = int(games)
             pStats[str(aid)]["kills"] = int(kills)
             pStats[str(aid)]["deaths"] = int(deaths)
             pStats[str(aid)]["kd"] = float(p_kd)
             pStats[str(aid)]["avg_score"] = float(p_avg_score)
 
-    #             if rank < 201:
-    #                 # <td>{str(dmg)}</td> #removed this line as it isn't crt data
-    #                 f.write(
-    #                     f"""
-    #             <tr>
-    #                 <td>{str(rank)}</td>
-    #                 <td style="text-align:center">{str(name)}</td>
-    #                 <td>{str(scores)}</td>
-    #                 <td>{str(kills)}</td>
-    #                 <td>{str(deaths)}</td>
-    #                 <td>{str(games)}</td>
-    #             </tr>"""
-    #                 )
-    #     f.write(
-    #         """
-    #         </table>
-    #     </body>
-    # </html>"""
-    #     )
-    #     f.close()
-
     f2 = open(mysettings.stats_file, "w")
-    f2.write(json.dumps(pStats, indent=4))
+    f2.write(json.dumps(pStats, indent=2))
     f2.close()
-
-    # if True:  # mysettings.mysettings[enableTop5commands]:
-    #     import roles
-
-    #     roles.toppersList = toppersIDs
-    #     with open(mysettings.python_path + "/roles.py") as file:
-    #         s = [row for row in file]
-    #         s[7] = "toppersList = " + str(roles.toppersList) + "\n"
-    #         f = open(mysettings.python_path + "/roles.py", "w")
-    #         for i in s:
-    #             f.write(i)
-    #         f.close()
 
 
 def get_name_from_master_server(account_id):
@@ -222,10 +158,8 @@ class UpdateThread(threading.Thread):
             # also incrementing the games played and adding the id
             stats[account_id]["games"] += 1
             stats[account_id]["aid"] = str(account_id)
+            print(json.dumps(stats[account_id], indent=2))
         # dump our stats back to disk
-        print(json.dumps(stats, indent=2))
-        from datetime import datetime
-
         with open(mysettings.stats_file, "w") as f:
             json.dump(stats, f)
         # aaand that's it!  There IS no step 27!

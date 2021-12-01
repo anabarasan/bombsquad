@@ -30,7 +30,7 @@
         $.get("/stats.json", function (data) {
           for (key in data) {
             let row_data = data[key];
-            let row = `<tr><td>${row_data.rank}</td><td>${row_data.name_html}</td><td>${row_data.scores}</td><td>${row_data.kills}</td><td>${row_data.deaths}</td><td>${row_data.games}</td><td>${row_data.avg_score}</td></tr>`;
+            let row = `<tr><td>${row_data.rank}</td><td>${row_data.name_html}</td><td>${row_data.scores}</td><td>${row_data.games}</td><td>${row_data.avg_score}</td><td>${row_data.kills}</td><td>${row_data.deaths}</td><td>${row_data.kd}</td></tr>`;
             $("#tbody").append(row);
           }
           $("#myTable").DataTable({
@@ -59,10 +59,11 @@
           <th scope="col">Rank</th>
           <th scope="col">Name</th>
           <th scope="col">Score</th>
-          <th scope="col">Kills</th>
-          <th scope="col">Deaths</th>
           <th scope="col">Games</th>
           <th scope="col">Average Score</th>
+          <th scope="col">Kills</th>
+          <th scope="col">Deaths</th>
+          <th scope="col">Kills / Deaths</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
