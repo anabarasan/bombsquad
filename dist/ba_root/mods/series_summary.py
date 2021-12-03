@@ -127,3 +127,9 @@ class SeriesSummary:
 
         with open(filename, "w") as f:
             f.write(html)
+
+        cls.match_results = []
+        cls.winning_sessionteam = None
+        cls.most_valuable_player = (None, None, None)
+        cls.most_violent_player = (None, None, None)
+        cls.most_violated_player = (None, None, None)

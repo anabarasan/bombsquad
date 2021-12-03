@@ -159,7 +159,7 @@ class UpdateThread(threading.Thread):
             # also incrementing the games played and adding the id
             stats[account_id]["games"] += 1
             stats[account_id]["aid"] = str(account_id)
-            print(json.dumps(stats[account_id], indent=2))
+            # print(json.dumps(stats[account_id], indent=2))
         # dump our stats back to disk
         with open(mysettings.stats_file, "w") as f:
             json.dump(stats, f)
