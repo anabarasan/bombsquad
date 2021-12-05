@@ -5,6 +5,9 @@ Provides functionality for storing match results at the end of a series
 
 from datetime import datetime
 import os
+import threading
+
+import requests
 
 import ba
 from ba._gameresults import GameResults
@@ -58,7 +61,12 @@ class SeriesSummary:
         data = {}
         player_scores = {}
         for player in stats.get_records().values():
-            player_scores[player.getname(True)] = player.accumscore
+            player_id = player.player.get_account_id()
+            player_scores[player.getname(True)] = (
+                player.accumscore,
+                player.accum_kill_count,
+                player.accum_killed_count,
+            )
 
         winning_team = results.winning_sessionteam
         data["winner"] = winning_team.name.evaluate() if winning_team else "no winner"
@@ -68,12 +76,17 @@ class SeriesSummary:
             players = []
             for player in team.players:
                 name = player.getname(True)
-                players.append((name, player_scores.get(name, "-")))
+                score, kill_count, killed_count = player_scores.get(
+                    name, ("-", "-", "-")
+                )
+                players.append((name, score, kill_count, killed_count))
 
             data["teams"].append(
                 {
                     "name": team.name.evaluate(),
-                    "score": results.get_sessionteam_score(team),
+                    "score": results.get_sessionteam_score(team)
+                    if results.get_sessionteam_score(team)
+                    else 0,
                     # score_str = results.get_sessionteam_score_str(team).evaluate(),
                     "players": players,
                 }
@@ -84,6 +97,7 @@ class SeriesSummary:
     def save_summary(cls):
         now = datetime.strftime(datetime.now(), "%Y%m%d%H%m%S%f")
         filename = os.path.join(mysettings.series_dir, f"{now}.html")
+        indexfile = os.path.join(mysettings.series_dir, "index.html")
         print(f"saving summary to {filename}")
         html = ""
         if cls.most_valuable_player[1]:
@@ -110,7 +124,7 @@ class SeriesSummary:
                 # html += f"""{team["name"]} ({team["score"]})"""
                 html += f"""{f'<i class="bi bi-trophy warning">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{team["name"]} ({team["score"]})</i>' if team["name"] == winner else f'{team["name"]} ({team["score"]})'}"""
                 html += """</div>"""
-                for player, player_score in team["players"]:
+                for player, player_score, kill_count, killed_count in team["players"]:
                     html += """<div class="row">"""
                     html += f"""{player} ({player_score})"""
                     html += """</div>"""
@@ -121,15 +135,331 @@ class SeriesSummary:
         html = (
             SUMMARY_HTML.replace("<<<details>>>", html)
             .replace("<<<series_time_stamp>>>", now)
-            .replace("<<<team_name>>>", "")
             .replace("<<<winning_team_name>>>", cls.winning_sessionteam.name.evaluate())
         )
 
         with open(filename, "w") as f:
             f.write(html)
 
+        with open(indexfile, "a") as f:
+            f.write(f"<a href={now}.html>{now}</a><br/>")
+
+        if mysettings.stats_server:
+            data = {}
+            data["winner"] = cls.winning_sessionteam.name.evaluate()
+            data["valuable_player"] = (
+                cls.most_valuable_player[1] if cls.most_valuable_player[1] else ""
+            )
+            data["violent_player"] = (
+                f"{cls.most_violent_player[1]} (kills = {cls.most_violent_player[2]})"
+                if cls.most_violent_player[1]
+                else ""
+            )
+            data["violated_player"] = (
+                f"{cls.most_violated_player[1]} (deaths = {cls.most_violated_player[2]})"
+                if cls.most_violated_player[1]
+                else ""
+            )
+            data["matches"] = cls.match_results
+
+            PostToStatsServer(data).start()
+
+        if mysettings.webhook_url:
+            PostToMsTeams(data).start()
+
         cls.match_results = []
         cls.winning_sessionteam = None
         cls.most_valuable_player = (None, None, None)
         cls.most_violent_player = (None, None, None)
         cls.most_violated_player = (None, None, None)
+
+
+class PostToStatsServer(threading.Thread):
+    def __init__(self, summary):
+        threading.Thread.__init__(self)
+        self._summary = summary
+
+    def run(self):
+        response = requests.post(
+            f"{mysettings.stats_server}/summary",
+            json=self._summary,
+            headers={"Content-Type": "application/json"},
+        )
+
+        response.raise_for_status()
+
+
+class PostToMsTeams(threading.Thread):
+    def __init__(self, summary):
+        threading.Thread.__init__(self)
+        self._summary = summary
+
+    def run(self):
+        payload = {
+            "type": "message",
+            "attachments": [
+                {
+                    "contentType": "application/vnd.microsoft.card.adaptive",
+                    "contentUrl": None,
+                    "content": self.prepare_adaptive_card_json(),
+                }
+            ],
+        }
+        import json
+
+        print("MsTeams Adaptive Card Data")
+        print(json.dumps(payload))
+        try:
+            response = requests.post(
+                url=mysettings.webhook_url,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            response.raise_for_status()
+        except Exception as err:
+            print(err)
+
+    def prepare_adaptive_card_json(self):
+        data = self._summary
+        card = {
+            "type": "AdaptiveCard",
+            "body": [
+                {
+                    "type": "FactSet",
+                    "facts": [
+                        {"title": "Result:", "value": f"{data['winner']} Wins"},
+                        {
+                            "title": "Most Valuable Player",
+                            "value": data["valuable_player"],
+                        },
+                        {
+                            "title": "Most Violent Player",
+                            "value": data["violent_player"],
+                        },
+                        {
+                            "title": "Most Violated Player",
+                            "value": data["violated_player"],
+                        },
+                    ],
+                },
+            ],
+            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+            "version": "1.4",
+        }
+
+        for idx, match in enumerate(data["matches"]):
+            details = []
+            # match number
+            details.append(
+                {
+                    "type": "TextBlock",
+                    "size": "Medium",
+                    "weight": "Bolder",
+                    "text": f"Match {idx+1}",
+                    "wrap": False,
+                    "style": "heading",
+                }
+            )
+            # match winning team name
+            details.append(
+                {
+                    "type": "FactSet",
+                    "facts": [{"title": "Winner:", "value": match["winner"]}],
+                }
+            )
+
+            # team details
+            for team in match["teams"]:
+                details.append(
+                    {"type": "TextBlock", "text": f"{team['name']} ({team['score']})"}
+                )
+                # player points table (v1.5)
+                # player_details = {
+                #     "type": "Table",
+                #     "columns": [{"width": 3}, {"width": 1}, {"width": 1}, {"width": 1}],
+                #     "rows": [
+                #         {
+                #             "type": "TableRow",
+                #             "cells": [
+                #                 {
+                #                     "type": "TableCell",
+                #                     "items": [
+                #                         {
+                #                             "type": "TextBlock",
+                #                             "text": "Name",
+                #                             "wrap": False,
+                #                             "weight": "Bolder",
+                #                             "style": "heading",
+                #                         },
+                #                     ],
+                #                 },
+                #                 {
+                #                     "type": "TableCell",
+                #                     "items": [
+                #                         {
+                #                             "type": "TextBlock",
+                #                             "text": "Score",
+                #                             "wrap": False,
+                #                             "weight": "Bolder",
+                #                             "style": "heading",
+                #                         },
+                #                     ],
+                #                 },
+                #                 {
+                #                     "type": "TableCell",
+                #                     "items": [
+                #                         {
+                #                             "type": "TextBlock",
+                #                             "text": "Kills",
+                #                             "wrap": False,
+                #                             "weight": "Bolder",
+                #                             "style": "heading",
+                #                         },
+                #                     ],
+                #                 },
+                #                 {
+                #                     "type": "TableCell",
+                #                     "items": [
+                #                         {
+                #                             "type": "TextBlock",
+                #                             "text": "Deaths",
+                #                             "wrap": False,
+                #                             "weight": "Bolder",
+                #                             "style": "heading",
+                #                         },
+                #                     ],
+                #                 },
+                #             ],
+                #             "style": "accent",
+                #         },
+                #     ],
+                # }
+                # for player in team["players"]:
+                #     player_details["rows"].append(
+                #         {
+                #             "type": "TableRow",
+                #             "cells": [
+                #                 {
+                #                     "type": "TableCell",
+                #                     "items": [
+                #                         {
+                #                             "type": "TextBlock",
+                #                             "text": player["name"],
+                #                             "wrap": False,
+                #                         },
+                #                     ],
+                #                 },
+                #                 {
+                #                     "type": "TableCell",
+                #                     "items": [
+                #                         {
+                #                             "type": "TextBlock",
+                #                             "text": str(player["score"]),
+                #                             "wrap": False,
+                #                         },
+                #                     ],
+                #                 },
+                #                 {
+                #                     "type": "TableCell",
+                #                     "items": [
+                #                         {
+                #                             "type": "TextBlock",
+                #                             "text": str(player["kills"]),
+                #                             "wrap": False,
+                #                         },
+                #                     ],
+                #                 },
+                #                 {
+                #                     "type": "TableCell",
+                #                     "items": [
+                #                         {
+                #                             "type": "TextBlock",
+                #                             "text": str(player["deaths"]),
+                #                             "wrap": False,
+                #                         },
+                #                     ],
+                #                 },
+                #             ],
+                #         }
+                #     )
+                # details.append(player_details)
+
+                # player points table (v1.4)
+                details.append(
+                    {
+                        "type": "ColumnSet",
+                        "columns": [
+                            {
+                                "type": "Column",
+                                "items": [
+                                    {"type": "TextBlock", "text": "Name"},
+                                ],
+                            },
+                            {
+                                "type": "Column",
+                                "items": [
+                                    {"type": "TextBlock", "text": "Score"},
+                                ],
+                            },
+                            {
+                                "type": "Column",
+                                "items": [
+                                    {"type": "TextBlock", "text": "Kills"},
+                                ],
+                            },
+                            {
+                                "type": "Column",
+                                "items": [
+                                    {"type": "TextBlock", "text": "Deaths"},
+                                ],
+                            },
+                        ],
+                        "style": "emphasis",
+                        "seperator": True,
+                    }
+                )
+                for player in team["players"]:
+                    player_details = {
+                        "type": "ColumnSet",
+                        "columns": [
+                            {
+                                "type": "Column",
+                                "items": [
+                                    {"type": "TextBlock", "text": player[0]}  # name
+                                ],
+                            },
+                            {
+                                "type": "Column",
+                                "items": [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": str(player[1]),
+                                    }  # score
+                                ],
+                            },
+                            {
+                                "type": "Column",
+                                "items": [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": str(player[2]),
+                                    }  # kills
+                                ],
+                            },
+                            {
+                                "type": "Column",
+                                "items": [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": str(player[3]),
+                                    }  # deaths
+                                ],
+                            },
+                        ],
+                        "seperator": True,
+                    }
+                    details.append(player_details)
+
+            card["body"].extend(details)
+
+        return card

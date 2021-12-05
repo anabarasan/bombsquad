@@ -2,7 +2,7 @@ FROM ubuntu:20.04
 
 ARG VERSION=1.6.5
 
-RUN apt update && DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends python3-pip python3.9-dev libopenal-dev libsdl2-dev libvorbis-dev cmake clang-format wget
+RUN apt update && DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends python3-pip python3.9-dev libopenal-dev libsdl2-dev libvorbis-dev cmake clang-format wget python3-requests
 
 WORKDIR /app
 

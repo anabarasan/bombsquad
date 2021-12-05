@@ -6,7 +6,7 @@ Provides functionality for dumping player stats to disk between rounds.
 from datetime import datetime
 import threading, json, os, urllib.request
 import mysettings
-from series_summary import SeriesSummary
+import requests
 
 
 def refreshStats():
@@ -67,12 +67,14 @@ def get_name_from_master_server(account_id):
     """
     url = "http://bombsquadgame.com/accountquery?id=" + account_id
     try:
-        response = json.loads(urllib.request.urlopen(urllib.Request(url)).read())
+        response = json.loads(urllib.request.urlopen(url).read())
         print("response variable from mystats.py line 183:")
         print(response)
         return response["name_html"]
     except Exception as exn:
+        print("#" * 80)
         print(exn)
+        print("#" * 80)
         return None
 
 
@@ -108,12 +110,18 @@ def update(score_set):
     # and write everything back to disk (along with a pretty html version)
     # We use a background thread so our server doesn't hitch while doing this.
     if account_scores:
-        UpdateThread(
-            account_names, account_kills, account_deaths, account_scores
-        ).start()
+        if mysettings.store_to_disk:
+            StoreToDisk(
+                account_names, account_kills, account_deaths, account_scores
+            ).start()
+
+        if mysettings.stats_server:
+            PostToStatsServer(
+                account_names, account_kills, account_deaths, account_scores
+            ).start()
 
 
-class UpdateThread(threading.Thread):
+class StoreToDisk(threading.Thread):
     def __init__(self, account_names, account_kills, account_deaths, account_scores):
         threading.Thread.__init__(self)
         self._account_names = account_names
@@ -170,3 +178,47 @@ class UpdateThread(threading.Thread):
             f"Added {str(len(self._account_kills))} account's stats entries. || {str(update_time)}"
         )
         refreshStats()
+
+
+class PostToStatsServer(threading.Thread):
+    def __init__(self, account_names, account_kills, account_deaths, account_scores):
+        threading.Thread.__init__(self)
+        self._account_names = account_names
+        self._account_kills = account_kills
+        self.account_deaths = account_deaths
+        self.account_scores = account_scores
+
+    def run(self):
+        stats = {}
+        # now add this batch of kills to our persistant stats
+        for account_id, kill_count in self._account_kills.items():
+            # lets ask the master-server for their account-display-str.
+            # (we only do this when first creating the entry to save time,
+            # though it may be smart to refresh it periodically since
+            # it may change)
+            name_html = get_name_from_master_server(account_id)
+            stats[account_id] = {
+                "rank": 0,
+                "name": (name_html if name_html else self._account_names[account_id]),
+                "scores": self.account_scores[account_id],
+                "total_damage": 0,
+                "kills": kill_count,
+                "deaths": self.account_deaths[account_id],
+                "games": 0,
+                "kd": 0,
+                "avg_score": 0,
+                "aid": str(account_id),
+            }
+        response = requests.post(
+            f"{mysettings.stats_server}/stats",
+            json=stats,
+            headers={"Content-Type": "application/json"},
+        )
+
+        response.raise_for_status()
+
+        now = datetime.now()
+        update_time = now.strftime("%S:%M:%H - %d %b %y")
+        print(
+            f"Added {str(len(self._account_kills))} account's stats entries. || {str(update_time)}"
+        )

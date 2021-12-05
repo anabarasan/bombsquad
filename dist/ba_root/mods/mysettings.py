@@ -8,6 +8,9 @@ html_file = "/var/www/html/stats.html"
 series_dir = "/var/www/html/series"
 server_name = "வாய்ச்சொல் வீரர்கள் (Vaaichol Veerargal)"
 python_path = _ba.env()["python_directory_user"]
+store_to_disk = False
+stats_server = None
+webhook_url = None
 
 
 def get_stats():
