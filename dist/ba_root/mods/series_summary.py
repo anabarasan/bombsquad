@@ -144,24 +144,24 @@ class SeriesSummary:
         with open(indexfile, "a") as f:
             f.write(f"<a href={now}.html>{now}</a><br/>")
 
-        if mysettings.stats_server:
-            data = {}
-            data["winner"] = cls.winning_sessionteam.name.evaluate()
-            data["valuable_player"] = (
-                cls.most_valuable_player[1] if cls.most_valuable_player[1] else ""
-            )
-            data["violent_player"] = (
-                f"{cls.most_violent_player[1]} (kills = {cls.most_violent_player[2]})"
-                if cls.most_violent_player[1]
-                else ""
-            )
-            data["violated_player"] = (
-                f"{cls.most_violated_player[1]} (deaths = {cls.most_violated_player[2]})"
-                if cls.most_violated_player[1]
-                else ""
-            )
-            data["matches"] = cls.match_results
+        data = {}
+        data["winner"] = cls.winning_sessionteam.name.evaluate()
+        data["valuable_player"] = (
+            cls.most_valuable_player[1] if cls.most_valuable_player[1] else ""
+        )
+        data["violent_player"] = (
+            f"{cls.most_violent_player[1]} (kills = {cls.most_violent_player[2]})"
+            if cls.most_violent_player[1]
+            else ""
+        )
+        data["violated_player"] = (
+            f"{cls.most_violated_player[1]} (deaths = {cls.most_violated_player[2]})"
+            if cls.most_violated_player[1]
+            else ""
+        )
+        data["matches"] = cls.match_results
 
+        if mysettings.stats_server:
             PostToStatsServer(data).start()
 
         if mysettings.webhook_url:
